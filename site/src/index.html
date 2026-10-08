@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en" data-version="{{version}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ArtCraft Apps Manager</title>
+  <meta name="description" content="A free, independent Windows app that installs the Craft apps from getartcraft.com using their official releases, and tells you when there's a new version.">
+  <link rel="canonical" href="https://artcraftappsmanager.web.app/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ArtCraft Apps Manager">
+  <meta property="og:description" content="An independent tool to install and update every Craft app on Windows. Free.">
+  <meta property="og:url" content="https://artcraftappsmanager.web.app/">
+  <meta property="og:image" content="https://artcraftappsmanager.web.app/assets/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#f2f1ee" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121316" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" href="/assets/logo.png" type="image/png">
+  <link rel="apple-touch-icon" href="/assets/logo.png">
+  <link rel="preload" href="/fonts/Archivo-SemiBold.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="/css/site.css">
+  <script>try { var t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+  <script type="module" src="/js/main.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="/" aria-label="ArtCraft Apps Manager home">
+        <img src="/assets/logo.png" alt="" width="28" height="28">
+        <b>ArtCraft Apps</b><span>Manager</span>
+      </a>
+      <nav class="nav" aria-label="Sections">
+        <a href="#features">Features</a>
+        <a href="#apps">Apps</a>
+        <a href="#install">Install</a>
+        <a href="#faq">Questions</a>
+        <a href="#about">About</a>
+      </nav>
+      <button class="btn icon-btn" type="button" data-theme-toggle aria-label="Switch between light and dark">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 2.75a7.25 7.25 0 0 0 0 14.5z" fill="currentColor"/></svg>
+      </button>
+      <a class="btn btn-primary top-download" href="/download/{{file}}" download data-download="header">Download</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="wrap">
+        <div class="hero-text">
+          <p class="hud">For Windows 10 and 11</p>
+          <h1>Every Craft app, installed and up to date.</h1>
+          <p class="lead">ArtCraft Apps Manager installs PhotoCraft, VectorCraft, FilmCraft and the rest of the Craft apps from their official releases, then tells you when a new version is out.</p>
+          <div class="actions">
+            <a class="btn btn-primary btn-lg" href="/download/{{file}}" download data-download="hero">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v9m0 0L4.5 7M8 10.5 11.5 7M2 14h12" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+              Download for Windows
+            </a>
+            <a class="btn btn-lg" href="#apps">See the apps</a>
+          </div>
+          <p class="hud meta">Version {{version}} <span>·</span> {{size}} <span>·</span> Free</p>
+          <p class="aside">An independent project, not affiliated with ArtCraft. The apps are developed and supported by their creators at <a href="https://getartcraft.com/">getartcraft.com</a>.</p>
+        </div>
+        <figure class="shot">
+          <div class="shot-bar" aria-hidden="true">
+            <img src="/assets/logo.png" alt="" width="14" height="14">
+            <span>ArtCraft Apps Manager</span>
+            <svg viewBox="0 0 96 12"><path d="M10 6h10M44 2h8v8h-8zM76 2l8 8m0-8-8 8" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+          </div>
+          <img class="only-light" src="/assets/shots/light.webp" width="460" height="660" alt="The ArtCraft Apps Manager window, listing installed apps with an Open button and available apps with an Install button.">
+          <img class="only-dark" src="/assets/shots/dark.webp" width="460" height="660" alt="The ArtCraft Apps Manager window, listing installed apps with an Open button and available apps with an Install button.">
+        </figure>
+      </div>
+    </section>
+
+    <section id="features" aria-labelledby="features-title">
+      <div class="bar"><div class="wrap"><span class="hud">01 / What it does</span></div></div>
+      <div class="wrap">
+        <h2 id="features-title">One place for all of them.</h2>
+        <ul class="grid features">
+          <li>
+            <span class="hud">01</span>
+            <h3>Every app in one list</h3>
+            <p>See which Craft apps you have, which version each one is on, and which ones you could add.</p>
+          </li>
+          <li>
+            <span class="hud">02</span>
+            <h3>Update notifications</h3>
+            <p>Checks for new releases every few hours and shows a Windows notification when there's an update.</p>
+          </li>
+          <li>
+            <span class="hud">03</span>
+            <h3>A download queue</h3>
+            <p>Queue installs and updates for as many apps as you like. They download one at a time and install in order.</p>
+          </li>
+          <li>
+            <span class="hud">04</span>
+            <h3>Verified downloads</h3>
+            <p>Each installer is checked against its published SHA-256 checksum before it runs.</p>
+          </li>
+          <li>
+            <span class="hud">05</span>
+            <h3>Official installers</h3>
+            <p>Apps install with their own installers into Program Files, with Start menu entries, and uninstall from Windows Settings like any other app.</p>
+          </li>
+          <li>
+            <span class="hud">06</span>
+            <h3>Stays out of the way</h3>
+            <p>Closing the window keeps it in the system tray. Starting with Windows is optional and off until you turn it on.</p>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="apps" aria-labelledby="apps-title">
+      <div class="bar"><div class="wrap"><span class="hud">02 / The apps</span><span class="hud">12</span></div></div>
+      <div class="wrap">
+        <h2 id="apps-title">The apps it installs.</h2>
+        <p class="intro">New Craft apps show up in the manager automatically when they publish a Windows release.</p>
+        <ul class="grid apps">
+          <li class="app" style="--ink-l:#1a5bc4;--ink-d:#7fb0ff">
+            <img src="/assets/apps/photocraft.png" alt="" width="56" height="56" loading="lazy">
+            <div><h3><a href="https://getartcraft.com/apps/photocraft">PhotoCraft</a></h3><p class="cat">Image editor</p><p>A clean-room Adobe Photoshop alternative.</p></div>
+          </li>
+          <li class="app" style="--ink-l:#b83a24;--ink-d:#ff8a70">
+            <img src="/assets/apps/vectorcraft.png" alt="" width="56" height="56" loading="lazy">
+            <div><h3><a href="https://getartcraft.com/apps/vectorcraft">VectorCraft</a></h3><p class="cat">Vector illustration</p><p>A clean-room Adobe Illustrator alternative.</p></div>
+          </li>
+          <li class="app" style="--ink-l:#6a3fd6;--ink-d:#b69cff">
+            <img src="/assets/apps/filmcraft.png" alt="" width="56" height="56" loading="lazy">
+            <div><h3><a href="https://getartcraft.com/apps/filmcraft">FilmCraft</a></h3><p class="cat">Video editor</p><p>A clean-room Adobe Premiere Pro alternative.</p></div>
+          </li>
+          <li class="app" style="--ink-l:#8a5800;--ink-d:#ffc14d">
+            <img src="/assets/apps/lightcraft.png" alt="" width="56" height="56" loading="lazy">
+            <div><h3><a href="https://getartcraft.com/apps/lightcraft">LightCraft</a></h3><p class="cat">Photo library &amp; raw developer</p><p>A clean-room Adobe Lightroom alternative.</p></div>
+          </li>
+          <li class="app" style="--ink-l:#0a7563;--ink-d:#3fd6b8">
+            <img src="/assets/apps/pdfcraft.png" alt="" width="56" height="56" loading="lazy">
+            <div><h3><a href="https://getartcraft.com/apps/pdfcraft">PdfCraft</a></h3><p class="cat">PDF editor</p><p>A clean-room Adobe Acrobat alternative.</p></div>
+          </li>
+          <li class="app" style="--ink-l:#b0206c;--ink-d:#ff7ab8">
+            <img src="/assets/apps/effectcraft.png" alt="" width="56" height="56" loading="lazy">
+            <div><h3><a href="https://getartcraft.com/apps/effectcraft">EffectCraft</a></h3><p class="cat">Motion graphics &amp; VFX</p><p>A clean-room Adobe After Effects alternative.</p></div>
+          </li>
+          <li class="app" style="--ink-l:#457008;--ink-d:#a6e04a">
+            <img src="/assets/apps/designcraft.png" alt="" width="56" height="56" loading="lazy">
+            <div><h3><a href="https://getartcraft.com/apps/designcraft">DesignCraft</a></h3><p class="cat">Page layout</p><p>A clean-room Adobe InDesign alternative.</p></div>
+          </li>
+          <li class="app" style="--ink-l:#0b6f82;--ink-d:#5fd3e8">
+            <img src="/assets/apps/soundcraft.png" alt="" width="56" height="56" loading="lazy">
+            <div><h3><a href="https://github.com/storytold/soundcraft">SoundCraft</a></h3><p class="cat">Audio workstation</p><p>A clean-room Avid Pro Tools alternative.</p></div>
+          </li>
+          <li class="app" style="--ink-l:#2a44b0;--ink-d:#8ea2ff">
+            <img src="/assets/apps/wordcraft.png" alt="" width="56" height="56" loading="lazy">
+            <div><h3><a href="https://github.com/storytold/wordcraft">WordCraft</a></h3><p class="cat">Word processor</p><p>A clean-room Microsoft Word alternative.</p></div>
+          </li>
+          <li class="app" style="--ink-l:#13703b;--ink-d:#5fd98f">
+            <img src="/assets/apps/gridcraft.png" alt="" width="56" height="56" loading="lazy">
+            <div><h3><a href="https://github.com/storytold/gridcraft">GridCraft</a></h3><p class="cat">Spreadsheets</p><p>A clean-room Microsoft Excel alternative.</p></div>
+          </li>
+          <li class="app" style="--ink-l:#b5470a;--ink-d:#ff9a5c">
+            <img src="/assets/apps/deckcraft.png" alt="" width="56" height="56" loading="lazy">
+            <div><h3><a href="https://github.com/storytold/deckcraft">DeckCraft</a></h3><p class="cat">Presentations</p><p>A clean-room Microsoft PowerPoint alternative.</p></div>
+          </li>
+          <li class="app" style="--ink-l:#0b6c85;--ink-d:#5ccbe8">
+            <img src="/assets/apps/cadcraft.png" alt="" width="56" height="56" loading="lazy">
+            <div><h3><a href="https://github.com/storytold/cadcraft">CADCraft</a></h3><p class="cat">CAD &amp; drafting</p><p>A clean-room AutoCAD alternative.</p></div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="install" aria-labelledby="install-title">
+      <div class="bar"><div class="wrap"><span class="hud">03 / Install</span></div></div>
+      <div class="wrap">
+        <h2 id="install-title">Set up in a minute.</h2>
+        <ol class="grid steps">
+          <li>
+            <span class="step">1</span>
+            <h3>Download</h3>
+            <p>Get the installer, a single {{size}} file.</p>
+          </li>
+          <li>
+            <span class="step">2</span>
+            <h3>Install</h3>
+            <p>Open it and allow the change when Windows asks. It installs for everyone who uses the PC.</p>
+          </li>
+          <li>
+            <span class="step">3</span>
+            <h3>Pick your apps</h3>
+            <p>Open ArtCraft Apps Manager from the Start menu and press Install next to the apps you want.</p>
+          </li>
+        </ol>
+        <p class="note">If Windows SmartScreen says it protected your PC, choose <strong>More info</strong>, then <strong>Run anyway</strong>. Windows shows this for installers it hasn't seen many downloads of yet.</p>
+        <dl class="spec">
+          <div><dt class="hud">Version</dt><dd>{{version}}, released {{released}}</dd></div>
+          <div><dt class="hud">File</dt><dd><a href="/download/{{file}}" download data-download="details">{{file}}</a> ({{size}})</dd></div>
+          <div><dt class="hud">Requires</dt><dd>Windows 10 or 11, 64-bit</dd></div>
+          <div><dt class="hud">Installs to</dt><dd>C:\Program Files\ArtCraft Apps Manager</dd></div>
+          <div><dt class="hud">SHA-256</dt><dd class="hash">{{sha256}}</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section id="faq" aria-labelledby="faq-title">
+      <div class="bar"><div class="wrap"><span class="hud">04 / Questions</span></div></div>
+      <div class="wrap">
+        <h2 id="faq-title">Questions.</h2>
+        <div class="faq">
+          <details>
+            <summary>Do I need a GitHub account?</summary>
+            <p>No. The manager reads release information from GitHub's public API, without signing in.</p>
+          </details>
+          <details>
+            <summary>Where do the apps go?</summary>
+            <p>Each app installs with its own official installer into C:\Program Files, with a Start menu entry, just as if you'd downloaded it yourself. Windows asks for permission each time.</p>
+          </details>
+          <details>
+            <summary>What happens to the old version when I update?</summary>
+            <p>The new version replaces it, so you only ever have one copy of each app.</p>
+          </details>
+          <details>
+            <summary>Does it run all the time?</summary>
+            <p>Closing the window keeps it in the system tray so it can check for updates. To stop it, choose Quit from the tray icon. It only starts with Windows if you turn that on in its Settings.</p>
+          </details>
+          <details>
+            <summary>How do I update the manager itself?</summary>
+            <p>Download the latest installer from this page and run it. It replaces the version you have.</p>
+          </details>
+          <details>
+            <summary>How do I remove it?</summary>
+            <p>Uninstall ArtCraft Apps Manager from Settings › Apps › Installed apps. The apps you installed with it stay installed.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section id="about" aria-labelledby="about-title">
+      <div class="bar"><div class="wrap"><span class="hud">05 / About</span></div></div>
+      <div class="wrap about">
+        <h2 id="about-title">An independent project.</h2>
+        <div class="about-body">
+          <div class="prose">
+            <p>ArtCraft Apps Manager is an independent tool, built to make the Craft apps easier to install and keep up to date. It isn't made by, affiliated with or endorsed by ArtCraft or the developers of the Craft apps.</p>
+            <p>The apps are created, published and supported by their developers at <a href="https://getartcraft.com/">getartcraft.com</a>. The manager downloads each app from its official release on GitHub and installs it unchanged. Each app's features, updates, licence and support remain the responsibility of its developers, so for questions about an app, please visit getartcraft.com.</p>
+            <p class="fine">ArtCraft, the Craft app names and logos, and the other product names on this page are trademarks of their respective owners.</p>
+          </div>
+          <dl class="spec">
+            <div><dt class="hud">The apps</dt><dd><a href="https://getartcraft.com/">getartcraft.com</a></dd></div>
+            <div><dt class="hud">Releases</dt><dd><a href="https://github.com/storytold">github.com/storytold</a></dd></div>
+            <div><dt class="hud">This manager</dt><dd>Independent and unofficial</dd></div>
+          </dl>
+        </div>
+        <a class="btn btn-lg" href="https://getartcraft.com/">
+          Visit getartcraft.com
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3h8v8M13 3 3 13" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        </a>
+      </div>
+    </section>
+
+    <section class="cta" aria-labelledby="cta-title">
+      <div class="wrap">
+        <h2 id="cta-title">Get the Craft apps in one place.</h2>
+        <div>
+          <a class="btn btn-primary btn-lg" href="/download/{{file}}" download data-download="footer">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v9m0 0L4.5 7M8 10.5 11.5 7M2 14h12" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            Download for Windows
+          </a>
+          <p class="hud meta">Version {{version}} <span>·</span> {{size}} <span>·</span> Free</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap">
+      <span class="hud">ArtCraft Apps Manager {{version}}</span>
+      <span class="hud">Independent project, not affiliated with ArtCraft</span>
+      <a class="hud" href="https://getartcraft.com/">The Craft apps: getartcraft.com</a>
+      <span class="hud">This page counts visits and downloads with Google Analytics</span>
+    </div>
+  </footer>
+</body>
+</html>

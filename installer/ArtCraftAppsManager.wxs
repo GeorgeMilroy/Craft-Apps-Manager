@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Installs ArtCraft Apps Manager for all users in C:\Program Files.
+  Build with build-installer.ps1, which supplies Version, ExePath and IconPath.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <!-- Never change the UpgradeCode: it's how newer versions replace older ones,
+       including those from before the rename, when this was Craft Apps Manager. -->
+  <Package Name="ArtCraft Apps Manager"
+           Manufacturer="ArtCraft Apps Manager"
+           Version="$(Version)"
+           UpgradeCode="{032C5B86-1AB6-4991-BE7B-4B5EBA894761}"
+           Scope="perMachine">
+    <SummaryInformation Description="Installs and updates the Craft apps from github.com/storytold" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="AppIcon.ico" SourceFile="$(IconPath)" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/storytold" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+
+    <!-- Closing the window only hides the app in the tray, so ask it to close and
+         then end it, so that upgrades and uninstalls don't need a restart. The
+         second entry is the exe's name before the rename. -->
+    <util:CloseApplication Id="CloseManager" Target="artcraft-apps-manager.exe"
+                           CloseMessage="yes" TerminateProcess="0" Timeout="3" RebootPrompt="no" />
+    <util:CloseApplication Id="CloseOldManager" Target="craft-apps-manager.exe"
+                           CloseMessage="yes" TerminateProcess="0" Timeout="3" RebootPrompt="no" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="ArtCraft Apps Manager">
+        <Component Id="MainExecutable">
+          <File Id="ArtCraftAppsManagerExe" Source="$(ExePath)" KeyPath="yes">
+            <Shortcut Id="StartMenuShortcut"
+                      Directory="ProgramMenuFolder"
+                      Name="ArtCraft Apps Manager"
+                      Description="Install and update the Craft apps"
+                      WorkingDirectory="INSTALLFOLDER"
+                      Icon="AppIcon.ico"
+                      Advertise="yes">
+              <!-- Matches the app's AppUserModelID, for taskbar grouping and notifications. -->
+              <ShortcutProperty Key="System.AppUserModel.ID" Value="ArtCraft.CraftAppsManager" />
+            </Shortcut>
+          </File>
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <!-- C:\ProgramData\ArtCraftAppsManager holds settings, the release cache, downloads
+         and logs. Users get write access so the app runs without admin rights.
+         Left in place on uninstall, like most apps' settings. The app moves the
+         contents of the pre-rename folder, C:\ProgramData\CraftAppsManager, into it. -->
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="DATAFOLDER" Name="ArtCraftAppsManager">
+        <Component Id="DataFolder" Guid="{0CF3975E-5AD7-4729-8CA3-0D08DE9B279A}">
+          <CreateFolder>
+            <util:PermissionEx User="[WIX_ACCOUNT_USERS]" GenericAll="yes" />
+          </CreateFolder>
+        </Component>
+      </Directory>
+    </StandardDirectory>
+    <!-- Defines WIX_ACCOUNT_USERS: the Users group's name in this Windows language. -->
+    <util:QueryWindowsWellKnownSIDs />
+
+    <Feature Id="Main">
+      <ComponentRef Id="MainExecutable" />
+      <ComponentRef Id="DataFolder" />
+    </Feature>
+  </Package>
+</Wix>

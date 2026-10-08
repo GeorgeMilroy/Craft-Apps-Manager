@@ -1,0 +1,5 @@
+/target
+/site/public
+/site/.firebase
+firebase-debug.log
+/site/firebase.json
