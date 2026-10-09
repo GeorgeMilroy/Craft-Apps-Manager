@@ -1,0 +1,2 @@
+# Shell scripts run on the Mac build machine, where CRLF line endings break them.
+*.sh text eol=lf

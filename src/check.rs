@@ -90,7 +90,7 @@ fn run(mgr: &Manager) -> bool {
             .collect();
         handles.into_iter().filter_map(|h| h.join().ok()).collect()
     });
-    let registry = installed::scan_registry();
+    let found = installed::scan(&apps);
 
     let mut guard = mgr.lock();
     let st = &mut *guard;
@@ -130,7 +130,7 @@ fn run(mgr: &Manager) -> bool {
     if ok {
         st.store.last_check = Some(now_unix());
     }
-    st.installed = installed::detect_all(&st.catalog, &registry);
+    st.installed = installed::detect_all(&st.catalog, &found);
 
     // Updates not announced yet. Each version is announced once, even if muted.
     let mut fresh = Vec::new();
@@ -176,8 +176,8 @@ fn update_message(updates: &[(String, String, String)], auto: bool) -> (String, 
 }
 
 /// Finds storytold repositories named "*craft" that aren't in the catalog
-/// yet but publish Windows builds. Returns the repo list's ETag and any new
-/// apps. Costs one request, plus one per candidate repository.
+/// yet but publish installers for this platform. Returns the repo list's
+/// ETag and any new apps. Costs one request, plus one per candidate repository.
 fn discover(client: &Client, catalog: &[AppInfo], etag: Option<&str>) -> (Option<String>, Vec<AppInfo>) {
     let Ok(Fetch::Fresh { value: repos, etag }) = client.org_repos(etag) else {
         return (None, Vec::new());

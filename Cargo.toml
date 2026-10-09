@@ -1,6 +1,6 @@
 [package]
 name = "artcraft-apps-manager"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 description = "Install, update and manage the ArtCraft desktop apps published at github.com/storytold"
 license = "MIT"
@@ -15,9 +15,11 @@ serde_json = "1"
 semver = "1"
 sha2 = "0.10"
 image = { version = "0.25", default-features = false, features = ["png"] }
-winreg = "0.55"
 notify-rust = "4"
 raw-window-handle = "0.6"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
 windows-sys = { version = "0.59", features = [
     "Win32_Foundation",
     "Win32_Security",
@@ -26,6 +28,26 @@ windows-sys = { version = "0.59", features = [
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }
+
+# The versions tray-icon already uses, so nothing extra is compiled.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+    "std",
+    "NSApplication",
+    "NSResponder",
+    "NSRunningApplication",
+    "NSView",
+    "NSWindow",
+] }
+objc2-foundation = { version = "0.3", default-features = false, features = [
+    "std",
+    "NSError",
+    "NSFileManager",
+    "NSString",
+    "NSURL",
+] }
+dispatch2 = { version = "0.3", default-features = false, features = ["std", "objc2"] }
 
 [build-dependencies]
 embed-resource = "3"

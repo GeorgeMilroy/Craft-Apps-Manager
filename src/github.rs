@@ -1,4 +1,5 @@
-//! GitHub releases: fetching them, and picking the right Windows download.
+//! GitHub releases: fetching them, and picking the right download: an MSI
+//! on Windows, a disk image on macOS.
 
 use crate::catalog::{AppInfo, OWNER};
 use crate::util::now_unix;
@@ -72,6 +73,8 @@ pub enum Arch {
 impl Arch {
     pub fn label(self) -> &'static str {
         match self {
+            Arch::X64 if cfg!(target_os = "macos") => "Intel",
+            Arch::Arm64 if cfg!(target_os = "macos") => "Apple silicon",
             Arch::X64 => "x64",
             Arch::Arm64 => "ARM64",
             Arch::X86 => "x86",
@@ -173,22 +176,23 @@ fn status_error(code: u16, resp: &ureq::Response) -> String {
     }
 }
 
-/// The newest stable release of `app` with a Windows installer (MSI).
+/// What this platform installs: Windows Installer packages on Windows, disk
+/// images on macOS.
+const INSTALLER_EXT: &str = if cfg!(target_os = "macos") { ".dmg" } else { ".msi" };
+
+/// The newest stable release of `app` with an installer for this platform.
 pub fn latest_release(app: &AppInfo, releases: &[Release]) -> Option<Release> {
     releases
         .iter()
-        .find(|r| !r.draft && !r.prerelease && r.assets.iter().any(|a| is_windows_asset(app, &a.name)))
+        .find(|r| !r.draft && !r.prerelease && r.assets.iter().any(|a| is_installer(app, &a.name)))
         .cloned()
 }
 
-/// The MSI best suited to a machine of `arch`.
+/// The installer best suited to a machine of `arch`.
 pub fn pick_asset<'a>(app: &AppInfo, release: &'a Release, arch: Arch) -> Option<&'a Asset> {
-    arch.runnable().iter().find_map(|want| {
-        release
-            .assets
-            .iter()
-            .find(|a| is_windows_asset(app, &a.name) && asset_arch(&a.name).unwrap_or(Arch::X64) == *want)
-    })
+    arch.runnable()
+        .iter()
+        .find_map(|want| release.assets.iter().find(|a| is_installer(app, &a.name) && runs_as(&a.name, *want)))
 }
 
 pub fn checksums_asset(release: &Release) -> Option<&Asset> {
@@ -203,14 +207,20 @@ fn tokens(name: &str) -> Vec<String> {
         .collect()
 }
 
-fn is_windows_asset(app: &AppInfo, name: &str) -> bool {
+fn is_installer(app: &AppInfo, name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     // Repos can ship more than one product (CLI tools, web builds, renamed apps).
     let ours = std::iter::once(app.id.as_str())
         .chain(app.names())
         .any(|n| lower.starts_with(&n.to_ascii_lowercase()));
     let t = tokens(name);
-    ours && lower.ends_with(".msi") && !t.iter().any(|t| t == "cli" || t == "web")
+    ours && lower.ends_with(INSTALLER_EXT) && !t.iter().any(|t| t == "cli" || t == "web")
+}
+
+/// Whether an installer is the build for `arch`. Universal Mac builds suit
+/// every Mac; a name that doesn't say is taken to be x64.
+fn runs_as(name: &str, arch: Arch) -> bool {
+    tokens(name).iter().any(|t| t == "universal") || asset_arch(name).unwrap_or(Arch::X64) == arch
 }
 
 fn asset_arch(name: &str) -> Option<Arch> {
@@ -292,6 +302,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)]
     fn picks_windows_assets() {
         let grid = app("gridcraft");
         let r = release(
@@ -327,10 +338,38 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "macos")]
+    fn picks_mac_assets() {
+        let grid = app("gridcraft");
+        let r = release(
+            "v0.3.0",
+            &[
+                "gridcraft-0.3.0-linux-x86_64.tar.gz",
+                "gridcraft-cli-0.3.0-macos-universal.zip",
+                "gridcraft-0.3.0-macos-universal.dmg",
+                "gridcraft-0.3.0-windows-x64.msi",
+                "gridcraft-web-0.3.0.zip",
+            ],
+        );
+        let pick = |arch| pick_asset(&grid, &r, arch).map(|a| a.name.as_str());
+        assert_eq!(pick(Arch::Arm64), Some("gridcraft-0.3.0-macos-universal.dmg"));
+        assert_eq!(pick(Arch::X64), Some("gridcraft-0.3.0-macos-universal.dmg"));
+
+        let art = AppInfo::discovered("artcraft", "ArtCraft", "", None);
+        let r = release(
+            "artcraft-v0.41.0",
+            &["ArtCraft_0.41.0_universal.dmg", "ArtCraft_universal.app.tar.gz", "ArtCraft_0.41.0_x64_en-US.msi"],
+        );
+        assert_eq!(pick_asset(&art, &r, Arch::Arm64).map(|a| a.name.as_str()), Some("ArtCraft_0.41.0_universal.dmg"));
+        let windows_only = release("artcraft-v0.42.0", &["ArtCraft_0.42.0_x64_en-US.msi"]);
+        assert!(latest_release(&art, &[windows_only]).is_none());
+    }
+
+    #[test]
     fn skips_releases_of_other_products() {
         let pdf = app("pdfcraft");
-        let old = release("v0.2.1", &["printcraft-0.2.1-windows-x64.msi"]);
-        let other = release("v0.1.0", &["somethingelse-0.1.0-windows-x64.msi"]);
+        let old = release("v0.2.1", &[&format!("printcraft-0.2.1-x64{INSTALLER_EXT}")]);
+        let other = release("v0.1.0", &[&format!("somethingelse-0.1.0-x64{INSTALLER_EXT}")]);
         assert!(latest_release(&pdf, &[other.clone(), old]).is_some());
         assert!(latest_release(&pdf, &[other]).is_none());
     }

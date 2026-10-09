@@ -166,13 +166,17 @@ impl ManagerApp {
             return;
         }
         ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+        platform::set_in_dock(false);
         self.hidden = true;
         let first_time = !std::mem::replace(&mut self.mgr.lock().store.tray_hint_shown, true);
         if first_time {
             self.mgr.save_store();
             notify::show(
                 format!("{APP_NAME} is still running"),
-                "It keeps checking for updates in the background. Use the tray icon to open it again or to quit.",
+                platform::os_text(
+                    "It keeps checking for updates in the background. Use the tray icon to open it again or to quit.",
+                    "It keeps checking for updates in the background. Use its menu bar icon to open it again or to quit.",
+                ),
             );
         }
     }
@@ -413,9 +417,13 @@ impl ManagerApp {
 
         section_bar(ui, p, 2, "General", None);
         padded(ui, |ui| {
-            setting(ui, p, &mut s.start_at_login, "Start when I sign in to Windows",
-                "Opens minimized in the system tray and checks for updates in the background.");
-            setting(ui, p, &mut s.minimize_to_tray, "Keep running in the tray when closed",
+            setting(ui, p, &mut s.start_at_login, platform::os_text("Start when I sign in to Windows", "Open at login"),
+                platform::os_text(
+                    "Opens minimized in the system tray and checks for updates in the background.",
+                    "Opens in the menu bar and checks for updates in the background.",
+                ));
+            setting(ui, p, &mut s.minimize_to_tray,
+                platform::os_text("Keep running in the tray when closed", "Keep running in the menu bar when closed"),
                 "When off, closing the window quits the app.");
         });
 
@@ -436,14 +444,20 @@ impl ManagerApp {
                 "Once per new version. Turn it off for one app from its ··· menu.");
             setting(ui, p, &mut s.notify_installs, "Notify me when an install finishes or fails", "");
             setting(ui, p, &mut s.auto_install_updates, "Install updates automatically",
-                "Updates are queued as soon as they're found. Windows asks for admin permission before each one installs.");
+                platform::os_text(
+                    "Updates are queued as soon as they're found. Windows asks for admin permission before each one installs.",
+                    "Updates are queued as soon as they're found. macOS may ask for an administrator's password before each one installs.",
+                ));
         });
 
         section_bar(ui, p, 4, "Installing", None);
         padded(ui, |ui| {
             ui.add(
                 egui::Label::new(
-                    RichText::new(r"Apps install for all users in C:\Program Files from their official installers, with a Start menu entry. Windows asks for admin permission each time.")
+                    RichText::new(platform::os_text(
+                        r"Apps install for all users in C:\Program Files from their official installers, with a Start menu entry. Windows asks for admin permission each time.",
+                        "Apps install in the Applications folder from their official disk images. macOS asks for an administrator's password if you can't change that folder.",
+                    ))
                         .small()
                         .color(p.muted),
                 )
@@ -459,7 +473,10 @@ impl ManagerApp {
         section_bar(ui, p, 5, "About", None);
         padded(ui, |ui| {
             ui.label(app_title(APP_NAME, env!("CARGO_PKG_VERSION"), p));
-            ui.label(hud(&format!("Windows {} · Release data from github.com/storytold", mgr.arch.label()), p.faint));
+            ui.label(hud(
+                &format!("{} {} · Release data from github.com/storytold", platform::OS_NAME, mgr.arch.label()),
+                p.faint,
+            ));
             ui.add(
                 egui::Label::new(
                     RichText::new("App icons and colours are the Craft apps' own. Fonts: Inter, Archivo and Geist Mono (SIL Open Font License).")
@@ -524,7 +541,10 @@ impl ManagerApp {
                 ui.add_space(4.0);
                 ui.add(
                     egui::Label::new(
-                        RichText::new("Windows Installer removes it and may ask for admin permission. Files you saved aren't affected.")
+                        RichText::new(platform::os_text(
+                            "Windows Installer removes it and may ask for admin permission. Files you saved aren't affected.",
+                            "It's moved to the Trash. Files you saved aren't affected.",
+                        ))
                             .color(p.muted),
                     )
                     .wrap(),
@@ -553,9 +573,11 @@ impl eframe::App for ManagerApp {
         if std::mem::take(&mut self.hide_on_first_frame) {
             // eframe always shows the window after its first frame; this hides it again straight after.
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+            platform::set_in_dock(false);
         } else if self.hidden && platform::is_main_window_visible() {
             // Shown from the tray or by a second launch: bring winit's view of it back in sync.
             self.hidden = false;
+            platform::set_in_dock(true);
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
             ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
         }
@@ -744,7 +766,7 @@ fn job_progress(ui: &mut egui::Ui, p: &Palette, job: &Job, jobs: &[Job], bar_col
         Status::ReadyToInstall if job.action == Action::Uninstall => ("Waiting to uninstall".to_owned(), None),
         Status::ReadyToInstall => ("Downloaded · waiting to install".to_owned(), Some(1.0)),
         Status::Installing if job.action == Action::Uninstall => ("Uninstalling…".to_owned(), None),
-        Status::Installing => ("Installing… approve the Windows prompt".to_owned(), None),
+        Status::Installing => (platform::os_text("Installing… approve the Windows prompt", "Installing…").to_owned(), None),
         Status::Done(m) | Status::Failed(m) => (m.clone(), None),
         Status::Cancelled => ("Cancelled".to_owned(), None),
     };

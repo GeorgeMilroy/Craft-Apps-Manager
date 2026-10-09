@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- build-macos.sh fills in {{version}}. Never change CFBundleIdentifier: macOS
+     keys the app's permissions, notifications and login item to it. -->
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleDisplayName</key>
+  <string>ArtCraft Apps Manager</string>
+  <key>CFBundleName</key>
+  <string>ArtCraft Apps Manager</string>
+  <key>CFBundleExecutable</key>
+  <string>artcraft-apps-manager</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
+  <key>CFBundleIdentifier</key>
+  <string>com.mecorelabs.artcraftappsmanager</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>{{version}}</string>
+  <key>CFBundleVersion</key>
+  <string>{{version}}</string>
+  <key>LSApplicationCategoryType</key>
+  <string>public.app-category.utilities</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>11.0</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>NSHumanReadableCopyright</key>
+  <string>ME Core Labs. Not affiliated with ArtCraft.</string>
+</dict>
+</plist>

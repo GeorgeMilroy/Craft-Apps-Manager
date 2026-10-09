@@ -1,13 +1,15 @@
-//! Windows toast notifications.
+//! Windows toast notifications, and macOS Notification Center ones.
 
 use crate::settings::Paths;
-use crate::{logo, APP_ID, APP_NAME};
-use winreg::enums::HKEY_CURRENT_USER;
-use winreg::RegKey;
 
 /// Registers this app's AppUserModelID so its toasts show under its own name
 /// and icon. Unpackaged apps have to do this themselves.
+#[cfg(windows)]
 pub fn register(paths: &Paths) {
+    use crate::{logo, APP_ID, APP_NAME};
+    use winreg::enums::HKEY_CURRENT_USER;
+    use winreg::RegKey;
+
     let icon_path = paths.data.join("icon.ico");
     let _ = std::fs::write(&icon_path, logo::ICO);
     let key = format!(r"Software\Classes\AppUserModelId\{APP_ID}");
@@ -17,10 +19,20 @@ pub fn register(paths: &Paths) {
     }
 }
 
-/// Shows a toast without blocking the caller.
+/// Sends notifications as this app's bundle, so they show its name and icon.
+#[cfg(target_os = "macos")]
+pub fn register(_paths: &Paths) {
+    let _ = notify_rust::set_application(crate::BUNDLE_ID);
+}
+
+/// Shows a notification without blocking the caller.
 pub fn show(title: impl Into<String>, body: impl Into<String>) {
     let (title, body) = (title.into(), body.into());
     std::thread::spawn(move || {
-        let _ = notify_rust::Notification::new().summary(&title).body(&body).app_id(APP_ID).show();
+        let mut notification = notify_rust::Notification::new();
+        notification.summary(&title).body(&body);
+        #[cfg(windows)]
+        notification.app_id(crate::APP_ID);
+        let _ = notification.show();
     });
 }

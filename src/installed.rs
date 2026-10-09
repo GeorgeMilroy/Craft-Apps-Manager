@@ -1,14 +1,12 @@
-//! Finding which apps are installed, at which version, and where.
+//! Finding which apps are installed, at which version, and where: from
+//! Windows' list of installed apps, or from the app bundles in the Mac's
+//! Applications folders.
 
 use crate::catalog::AppInfo;
 use crate::github::is_newer;
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use winreg::enums::*;
-use winreg::RegKey;
-
-const UNINSTALL: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+use std::path::PathBuf;
 
 #[derive(Clone, Debug)]
 pub struct Installed {
@@ -19,23 +17,34 @@ pub struct Installed {
 
 #[derive(Clone, Debug)]
 pub enum Source {
+    #[cfg(windows)]
     Msi { product_code: String },
     /// Installed by a non-MSI installer, such as an NSIS setup.exe.
+    #[cfg(windows)]
     Program { uninstall: Option<String> },
+    /// An app bundle, such as /Applications/PhotoCraft.app.
+    #[cfg(target_os = "macos")]
+    Bundle { path: PathBuf },
 }
 
-/// One entry from the Windows "Installed apps" list.
-pub struct RegEntry {
-    key: String,
+/// One installed program, as the platform lists it.
+pub struct Entry {
     display_name: String,
     version: String,
-    location: Option<String>,
-    uninstall: Option<String>,
-    msi: bool,
+    /// Installed the way this manager installs apps (from an MSI, or as an app
+    /// bundle), which wins over other entries with the same name.
+    preferred: bool,
+    source: Source,
+    location: Option<PathBuf>,
 }
 
 /// Reads the machine-wide (64- and 32-bit) and per-user uninstall entries.
-pub fn scan_registry() -> Vec<RegEntry> {
+#[cfg(windows)]
+pub fn scan(_apps: &[AppInfo]) -> Vec<Entry> {
+    use winreg::enums::*;
+    use winreg::RegKey;
+    const UNINSTALL: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+
     let views = [
         (HKEY_LOCAL_MACHINE, KEY_WOW64_64KEY),
         (HKEY_LOCAL_MACHINE, KEY_WOW64_32KEY),
@@ -54,11 +63,16 @@ pub fn scan_registry() -> Vec<RegEntry> {
             let (Some(display_name), Some(version)) = (get("DisplayName"), get("DisplayVersion")) else {
                 continue;
             };
-            out.push(RegEntry {
-                msi: k.get_value::<u32, _>("WindowsInstaller").unwrap_or(0) == 1,
-                location: get("InstallLocation"),
-                uninstall: get("QuietUninstallString").or_else(|| get("UninstallString")),
-                key,
+            let msi = k.get_value::<u32, _>("WindowsInstaller").unwrap_or(0) == 1;
+            let source = if msi && key.starts_with('{') {
+                Source::Msi { product_code: key }
+            } else {
+                Source::Program { uninstall: get("QuietUninstallString").or_else(|| get("UninstallString")) }
+            };
+            out.push(Entry {
+                preferred: msi,
+                location: get("InstallLocation").map(PathBuf::from),
+                source,
                 display_name,
                 version,
             });
@@ -67,18 +81,61 @@ pub fn scan_registry() -> Vec<RegEntry> {
     out
 }
 
-pub fn detect_all(apps: &[AppInfo], registry: &[RegEntry]) -> HashMap<String, Installed> {
+/// Finds the catalog's apps among the bundles in /Applications and
+/// ~/Applications. Only bundles named like an app have their version read.
+#[cfg(target_os = "macos")]
+pub fn scan(apps: &[AppInfo]) -> Vec<Entry> {
+    let mut dirs = vec![PathBuf::from("/Applications")];
+    if let Some(home) = std::env::var_os("HOME") {
+        dirs.push(PathBuf::from(home).join("Applications"));
+    }
+    let mut out = Vec::new();
+    for dir in dirs {
+        let Ok(items) = std::fs::read_dir(&dir) else { continue };
+        for path in items.flatten().map(|i| i.path()) {
+            if path.extension().is_none_or(|x| x != "app") {
+                continue;
+            }
+            let Some(name) = path.file_stem().map(|s| s.to_string_lossy().into_owned()) else { continue };
+            if !apps.iter().any(|app| name_matches(app, &name)) {
+                continue;
+            }
+            let Some(version) = bundle_version(&path) else { continue };
+            out.push(Entry {
+                display_name: name,
+                version,
+                preferred: true,
+                source: Source::Bundle { path: path.clone() },
+                location: Some(path),
+            });
+        }
+    }
+    out
+}
+
+/// The version in a bundle's Info.plist, which may be XML or binary.
+#[cfg(target_os = "macos")]
+fn bundle_version(bundle: &std::path::Path) -> Option<String> {
+    let info = bundle.join("Contents").join("Info");
+    ["CFBundleShortVersionString", "CFBundleVersion"].iter().find_map(|key| {
+        let out = std::process::Command::new("/usr/bin/defaults").arg("read").arg(&info).arg(key).output().ok()?;
+        let version = String::from_utf8(out.stdout).ok()?.trim().to_owned();
+        (out.status.success() && !version.is_empty()).then_some(version)
+    })
+}
+
+pub fn detect_all(apps: &[AppInfo], found: &[Entry]) -> HashMap<String, Installed> {
     apps.iter()
-        .filter_map(|app| detect(app, registry).map(|i| (app.id.clone(), i)))
+        .filter_map(|app| detect(app, found).map(|i| (app.id.clone(), i)))
         .collect()
 }
 
-fn detect(app: &AppInfo, registry: &[RegEntry]) -> Option<Installed> {
-    // Prefer MSI entries (what this manager installs), then the
+fn detect(app: &AppInfo, found: &[Entry]) -> Option<Installed> {
+    // Prefer what this manager installs (MSIs, app bundles), then the
     // newest version, in case an old name was left installed alongside.
-    let mut entries: Vec<&RegEntry> = registry.iter().filter(|e| name_matches(app, &e.display_name)).collect();
+    let mut entries: Vec<&Entry> = found.iter().filter(|e| name_matches(app, &e.display_name)).collect();
     entries.sort_by(|a, b| {
-        b.msi.cmp(&a.msi).then_with(|| {
+        b.preferred.cmp(&a.preferred).then_with(|| {
             if is_newer(&a.version, &b.version) {
                 Ordering::Less
             } else if is_newer(&b.version, &a.version) {
@@ -89,12 +146,12 @@ fn detect(app: &AppInfo, registry: &[RegEntry]) -> Option<Installed> {
         })
     });
     let e = entries.first()?;
-    let source = if e.msi && e.key.starts_with('{') {
-        Source::Msi { product_code: e.key.clone() }
-    } else {
-        Source::Program { uninstall: e.uninstall.clone() }
-    };
-    Some(Installed { version: e.version.clone(), source, exe: find_installed_exe(app, e.location.as_deref()) })
+    // On a Mac the bundle itself is what gets opened.
+    #[cfg(target_os = "macos")]
+    let exe = e.location.clone();
+    #[cfg(windows)]
+    let exe = find_installed_exe(app, e.location.clone());
+    Some(Installed { version: e.version.clone(), source: e.source.clone(), exe })
 }
 
 fn normalize(s: &str) -> String {
@@ -110,8 +167,9 @@ fn name_matches(app: &AppInfo, display_name: &str) -> bool {
     })
 }
 
-fn find_installed_exe(app: &AppInfo, location: Option<&str>) -> Option<PathBuf> {
-    let mut dirs: Vec<PathBuf> = location.map(PathBuf::from).into_iter().collect();
+#[cfg(windows)]
+fn find_installed_exe(app: &AppInfo, location: Option<PathBuf>) -> Option<PathBuf> {
+    let mut dirs: Vec<PathBuf> = location.into_iter().collect();
     for var in ["ProgramW6432", "ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"] {
         if let Some(base) = std::env::var_os(var).map(PathBuf::from) {
             for name in app.names() {
@@ -127,7 +185,8 @@ fn find_installed_exe(app: &AppInfo, location: Option<&str>) -> Option<PathBuf> 
 
 /// The app's main executable in `dir`: `<id>.exe` or `<name>.exe` if present,
 /// otherwise the first .exe that isn't a CLI tool or uninstaller.
-fn find_exe_in(dir: &Path, app: &AppInfo) -> Option<PathBuf> {
+#[cfg(windows)]
+fn find_exe_in(dir: &std::path::Path, app: &AppInfo) -> Option<PathBuf> {
     let stems: Vec<String> = std::iter::once(app.id.clone())
         .chain(app.names().map(str::to_lowercase))
         .collect();

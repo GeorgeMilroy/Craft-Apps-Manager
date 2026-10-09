@@ -6,10 +6,9 @@ use crate::github::{self, Arch, Release};
 use crate::installed::{self, Installed};
 use crate::jobs::{self, Action, Job, Status};
 use crate::settings::{self, Paths, Settings, Store};
-use crate::{autostart, check, notify, tray, util};
+use crate::{autostart, check, notify, platform, tray, util};
 use eframe::egui;
 use std::collections::{BTreeMap, HashMap};
-use std::path::Path;
 use std::process::Command;
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, PoisonError};
@@ -73,7 +72,7 @@ impl State {
         let version = release.version();
         let asset = github::pick_asset(&app, release, arch)
             .cloned()
-            .ok_or_else(|| format!("{} {version} has no installer for Windows {}.", app.name, arch.label()))?;
+            .ok_or_else(|| format!("{} {version} has no installer for {} {}.", app.name, platform::OS_NAME, arch.label()))?;
         let checksums = github::checksums_asset(release).map(|a| a.browser_download_url.clone());
         self.jobs.push(Job::new(id, app, action, version, Some(asset), checksums));
         Ok(())
@@ -104,7 +103,7 @@ impl Manager {
         }
         // Drop cached data for apps no longer listed (such as ArtCraft).
         store.releases.retain(|id, _| catalog.iter().any(|a| &a.id == id));
-        let installed = installed::detect_all(&catalog, &installed::scan_registry());
+        let installed = installed::detect_all(&catalog, &installed::scan(&catalog));
 
         // Partial files from downloads cut short by the last exit.
         if let Ok(entries) = std::fs::read_dir(&paths.downloads) {
@@ -241,10 +240,9 @@ impl Manager {
     }
 
     pub fn refresh_installed(&self) {
-        let registry = installed::scan_registry();
-        let mut st = self.lock();
-        let found = installed::detect_all(&st.catalog, &registry);
-        st.installed = found;
+        let catalog = self.lock().catalog.clone();
+        let found = installed::detect_all(&catalog, &installed::scan(&catalog));
+        self.lock().installed = found;
     }
 
     pub fn launch(&self, app_id: &str) -> Result<(), String> {
@@ -254,11 +252,29 @@ impl Manager {
             .get(app_id)
             .and_then(|i| i.exe.clone())
             .ok_or("Couldn't find the app's program file.")?;
-        Command::new(&exe)
-            .current_dir(exe.parent().unwrap_or(Path::new(".")))
-            .spawn()
-            .map(drop)
-            .map_err(|e| format!("Couldn't start {}: {e}", exe.display()))
+        // On a Mac, `exe` is the app bundle, which only `open` can start.
+        #[cfg(target_os = "macos")]
+        let mut command = {
+            let mut c = Command::new("/usr/bin/open");
+            c.arg(&exe);
+            c
+        };
+        #[cfg(windows)]
+        let mut command = {
+            let mut c = Command::new(&exe);
+            c.current_dir(exe.parent().unwrap_or(std::path::Path::new(".")));
+            c
+        };
+        let child = command.spawn().map_err(|e| format!("Couldn't start {}: {e}", exe.display()))?;
+        // `open` exits once the app is running; waiting for it stops it lingering as a zombie.
+        #[cfg(target_os = "macos")]
+        std::thread::spawn(move || {
+            let mut child = child;
+            child.wait()
+        });
+        #[cfg(windows)]
+        drop(child);
+        Ok(())
     }
 
     pub fn set_muted(&self, app_id: &str, muted: bool) {

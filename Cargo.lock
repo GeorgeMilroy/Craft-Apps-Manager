@@ -197,12 +197,16 @@ checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
 
 [[package]]
 name = "artcraft-apps-manager"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
+ "dispatch2",
  "eframe",
  "embed-resource",
  "image",
  "notify-rust",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
  "raw-window-handle",
  "semver",
  "serde",

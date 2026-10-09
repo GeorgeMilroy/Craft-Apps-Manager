@@ -4,22 +4,17 @@
 
 use crate::catalog::AppInfo;
 use crate::github::Asset;
-use crate::installed::Source;
 use crate::manager::Manager;
 use crate::util::{self, human_bytes};
+use imp::{install, uninstall};
 use sha2::{Digest, Sha256};
-use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
-use std::os::windows::process::CommandExt;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Instant;
-
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
@@ -67,7 +62,7 @@ pub struct Job {
     pub app: AppInfo,
     pub action: Action,
     pub version: String,
-    /// The MSI to install. None for uninstalls, which skip the download.
+    /// The installer to download. None for uninstalls, which skip the download.
     pub asset: Option<Asset>,
     pub checksums_url: Option<String>,
     pub status: Status,
@@ -256,76 +251,240 @@ fn expected_sha256(mgr: &Manager, asset: &Asset, checksums_url: Option<&str>) ->
     })
 }
 
-fn install(mgr: &Manager, job: &Job) -> Result<String, String> {
-    let file = job.file.as_deref().ok_or("The download is missing.")?;
-    let log = mgr.paths.logs.join(format!("{}-{}.log", job.app.id, job.version));
-    // A same-version reinstall has to be a repair; /i would do nothing.
-    let mode = if job.action == Action::Reinstall { "/fvamus" } else { "/i" };
-    let code = msiexec([OsStr::new(mode), file.as_os_str(), "/passive".as_ref(), "/norestart".as_ref(), "/l*v".as_ref(), log.as_os_str()])?;
-    let restart = msi_outcome(code, &log)?;
-    let (name, version) = (&job.app.name, &job.version);
-    let mut message = match job.action {
-        Action::Update => format!("{name} updated to {version}"),
-        Action::Reinstall => format!("{name} {version} reinstalled"),
-        _ => format!("{name} {version} installed"),
-    };
-    if restart {
-        message.push_str(". Restart Windows to finish.");
-    }
-    Ok(message)
-}
+/// Installs with Windows Installer, which asks for admin permission itself.
+#[cfg(windows)]
+mod imp {
+    use super::{Action, Job};
+    use crate::installed::Source;
+    use crate::manager::Manager;
+    use std::ffi::OsStr;
+    use std::os::windows::process::CommandExt;
+    use std::path::{Path, PathBuf};
+    use std::process::Command;
 
-fn uninstall(mgr: &Manager, job: &Job) -> Result<String, String> {
-    let name = &job.app.name;
-    let installed = mgr.lock().installed.get(&job.app.id).cloned().ok_or_else(|| format!("{name} isn't installed."))?;
-    match installed.source {
-        Source::Msi { product_code } => {
-            let log = mgr.paths.logs.join(format!("{}-uninstall.log", job.app.id));
-            let code = msiexec([OsStr::new("/x"), product_code.as_ref(), "/passive".as_ref(), "/norestart".as_ref(), "/l*v".as_ref(), log.as_os_str()])?;
-            msi_outcome(code, &log)?;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+    pub fn install(mgr: &Manager, job: &Job) -> Result<String, String> {
+        let file = job.file.as_deref().ok_or("The download is missing.")?;
+        let log = mgr.paths.logs.join(format!("{}-{}.log", job.app.id, job.version));
+        // A same-version reinstall has to be a repair; /i would do nothing.
+        let mode = if job.action == Action::Reinstall { "/fvamus" } else { "/i" };
+        let code = msiexec([OsStr::new(mode), file.as_os_str(), "/passive".as_ref(), "/norestart".as_ref(), "/l*v".as_ref(), log.as_os_str()])?;
+        let restart = msi_outcome(code, &log)?;
+        let (name, version) = (&job.app.name, &job.version);
+        let mut message = match job.action {
+            Action::Update => format!("{name} updated to {version}"),
+            Action::Reinstall => format!("{name} {version} reinstalled"),
+            _ => format!("{name} {version} installed"),
+        };
+        if restart {
+            message.push_str(". Restart Windows to finish.");
         }
-        Source::Program { uninstall: Some(command) } => {
-            // Registry uninstall strings are command lines, so run them as such.
-            let status = Command::new("cmd.exe")
-                .raw_arg(format!("/S /C \"{command}\""))
-                .creation_flags(CREATE_NO_WINDOW)
-                .status()
-                .map_err(|e| format!("Couldn't start the uninstaller: {e}"))?;
-            if !status.success() {
-                return Err(format!("The uninstaller failed (exit code {}).", status.code().unwrap_or(-1)));
+        Ok(message)
+    }
+
+    pub fn uninstall(mgr: &Manager, job: &Job) -> Result<String, String> {
+        let name = &job.app.name;
+        let installed = mgr.lock().installed.get(&job.app.id).cloned().ok_or_else(|| format!("{name} isn't installed."))?;
+        match installed.source {
+            Source::Msi { product_code } => {
+                let log = mgr.paths.logs.join(format!("{}-uninstall.log", job.app.id));
+                let code = msiexec([OsStr::new("/x"), product_code.as_ref(), "/passive".as_ref(), "/norestart".as_ref(), "/l*v".as_ref(), log.as_os_str()])?;
+                msi_outcome(code, &log)?;
+            }
+            Source::Program { uninstall: Some(command) } => {
+                // Registry uninstall strings are command lines, so run them as such.
+                let status = Command::new("cmd.exe")
+                    .raw_arg(format!("/S /C \"{command}\""))
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .status()
+                    .map_err(|e| format!("Couldn't start the uninstaller: {e}"))?;
+                if !status.success() {
+                    return Err(format!("The uninstaller failed (exit code {}).", status.code().unwrap_or(-1)));
+                }
+            }
+            Source::Program { uninstall: None } => {
+                return Err(format!("{name} has no registered uninstaller. Remove it from Windows Settings > Apps."));
             }
         }
-        Source::Program { uninstall: None } => {
-            return Err(format!("{name} has no registered uninstaller. Remove it from Windows Settings > Apps."));
+        Ok(format!("{name} uninstalled"))
+    }
+
+    fn msiexec<I, S>(args: I) -> Result<i32, String>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
+        let exe = std::env::var_os("SystemRoot")
+            .map(|root| PathBuf::from(root).join("System32").join("msiexec.exe"))
+            .unwrap_or_else(|| PathBuf::from("msiexec.exe"));
+        let status = Command::new(exe)
+            .args(args)
+            .status()
+            .map_err(|e| format!("Couldn't start Windows Installer: {e}"))?;
+        Ok(status.code().unwrap_or(-1))
+    }
+
+    /// Interprets a Windows Installer exit code. Ok(true) means a restart is needed.
+    fn msi_outcome(code: i32, log: &Path) -> Result<bool, String> {
+        match code {
+            0 => Ok(false),
+            1641 | 3010 => Ok(true),
+            1602 => Err("Cancelled: the installer was closed or admin permission was declined.".into()),
+            1618 => Err("Another installation is already running. Try again when it finishes.".into()),
+            1625 | 1643 => Err("Blocked by a system policy on this PC.".into()),
+            1638 => Err("A different version is already installed. Uninstall it first.".into()),
+            _ => Err(format!("Windows Installer failed (error {code}). Log: {}", log.display())),
         }
     }
-    Ok(format!("{name} uninstalled"))
 }
 
-fn msiexec<I, S>(args: I) -> Result<i32, String>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let exe = std::env::var_os("SystemRoot")
-        .map(|root| PathBuf::from(root).join("System32").join("msiexec.exe"))
-        .unwrap_or_else(|| PathBuf::from("msiexec.exe"));
-    let status = Command::new(exe)
-        .args(args)
-        .status()
-        .map_err(|e| format!("Couldn't start Windows Installer: {e}"))?;
-    Ok(status.code().unwrap_or(-1))
-}
+/// Copies apps out of their disk images into /Applications. macOS asks for an
+/// administrator's password when the user can't write there.
+#[cfg(target_os = "macos")]
+mod imp {
+    use super::{Action, Job};
+    use crate::installed::Source;
+    use crate::manager::Manager;
+    use std::fs;
+    use std::path::Path;
+    use std::process::{Command, Output};
 
-/// Interprets a Windows Installer exit code. Ok(true) means a restart is needed.
-fn msi_outcome(code: i32, log: &Path) -> Result<bool, String> {
-    match code {
-        0 => Ok(false),
-        1641 | 3010 => Ok(true),
-        1602 => Err("Cancelled: the installer was closed or admin permission was declined.".into()),
-        1618 => Err("Another installation is already running. Try again when it finishes.".into()),
-        1625 | 1643 => Err("Blocked by a system policy on this PC.".into()),
-        1638 => Err("A different version is already installed. Uninstall it first.".into()),
-        _ => Err(format!("Windows Installer failed (error {code}). Log: {}", log.display())),
+    const APPLICATIONS: &str = "/Applications";
+
+    pub fn install(mgr: &Manager, job: &Job) -> Result<String, String> {
+        let file = job.file.as_deref().ok_or("The download is missing.")?;
+        let mount = mgr.paths.downloads.join(format!("mount-{}", job.id));
+        fs::create_dir_all(&mount).map_err(|e| format!("Couldn't open the disk image: {e}"))?;
+        let attach = Command::new("/usr/bin/hdiutil")
+            .arg("attach")
+            .arg(file)
+            .arg("-mountpoint")
+            .arg(&mount)
+            .args(["-nobrowse", "-noautoopen", "-readonly"])
+            .output();
+        if let Err(e) = checked(attach) {
+            let _ = fs::remove_dir(&mount);
+            return Err(format!("Couldn't open the disk image: {e}"));
+        }
+        let result = copy_app(&mount, job);
+        let _ = Command::new("/usr/bin/hdiutil").args(["detach", "-force"]).arg(&mount).output();
+        let _ = fs::remove_dir(&mount);
+        result?;
+
+        let (name, version) = (&job.app.name, &job.version);
+        Ok(match job.action {
+            Action::Update => format!("{name} updated to {version}"),
+            Action::Reinstall => format!("{name} {version} reinstalled"),
+            _ => format!("{name} {version} installed"),
+        })
+    }
+
+    /// Copies the image's app next to the installed one, then swaps it in, so
+    /// a failed copy never leaves a half-installed app behind.
+    fn copy_app(mount: &Path, job: &Job) -> Result<(), String> {
+        let app = fs::read_dir(mount)
+            .map_err(|e| format!("Couldn't read the disk image: {e}"))?
+            .flatten()
+            .map(|e| e.path())
+            .find(|p| p.extension().is_some_and(|x| x == "app") && !p.is_symlink())
+            .ok_or("The disk image doesn't contain an app.")?;
+        let bundle = app.file_name().ok_or("The disk image doesn't contain an app.")?;
+        let dest = Path::new(APPLICATIONS).join(bundle);
+        let name = bundle.to_string_lossy();
+        let staged = Path::new(APPLICATIONS).join(format!(".{name}.new-{}", job.id));
+        let old = Path::new(APPLICATIONS).join(format!(".{name}.old-{}", job.id));
+
+        if can_write(Path::new(APPLICATIONS)) {
+            let _ = fs::remove_dir_all(&staged);
+            checked(Command::new("/usr/bin/ditto").arg(&app).arg(&staged).output())
+                .map_err(|e| format!("Couldn't copy {name} to Applications: {e}"))?;
+            let swapped = (|| {
+                if dest.exists() {
+                    fs::rename(&dest, &old)?;
+                }
+                fs::rename(&staged, &dest)
+            })();
+            if let Err(e) = swapped {
+                if !dest.exists() && old.exists() {
+                    let _ = fs::rename(&old, &dest);
+                }
+                let _ = fs::remove_dir_all(&staged);
+                return Err(format!("Couldn't replace {name} in Applications: {e}"));
+            }
+            let _ = fs::remove_dir_all(&old);
+            Ok(())
+        } else {
+            let (app, dest, staged) = (quote(&app), quote(&dest), quote(&staged));
+            as_admin(
+                &format!(
+                    "/bin/rm -rf {staged} && /usr/bin/ditto {app} {staged} && /bin/rm -rf {dest} && /bin/mv {staged} {dest}"
+                ),
+                &format!("install {}", job.app.name),
+            )
+        }
+    }
+
+    pub fn uninstall(mgr: &Manager, job: &Job) -> Result<String, String> {
+        let name = &job.app.name;
+        let installed = mgr.lock().installed.get(&job.app.id).cloned().ok_or_else(|| format!("{name} isn't installed."))?;
+        let Source::Bundle { path } = installed.source;
+        if trash(&path).is_err() {
+            // Moving it needs permissions the user doesn't have, so it's deleted instead.
+            as_admin(&format!("/bin/rm -rf {}", quote(&path)), &format!("uninstall {name}"))?;
+            return Ok(format!("{name} uninstalled"));
+        }
+        Ok(format!("{name} moved to the Trash"))
+    }
+
+    fn trash(path: &Path) -> Result<(), String> {
+        use objc2_foundation::{NSFileManager, NSString, NSURL};
+        let url = NSURL::fileURLWithPath(&NSString::from_str(&path.to_string_lossy()));
+        NSFileManager::defaultManager()
+            .trashItemAtURL_resultingItemURL_error(&url, None)
+            .map_err(|e| e.localizedDescription().to_string())
+    }
+
+    /// Whether this user can create files in `dir`, as admins usually can in /Applications.
+    fn can_write(dir: &Path) -> bool {
+        let probe = dir.join(format!(".artcraft-apps-manager-{}", std::process::id()));
+        let ok = fs::File::create(&probe).is_ok();
+        let _ = fs::remove_file(&probe);
+        ok
+    }
+
+    /// Runs a shell command as root, after macOS asks for an administrator's
+    /// name and password, explaining that the app wants to `purpose`.
+    fn as_admin(command: &str, purpose: &str) -> Result<(), String> {
+        let applescript = |s: &str| s.replace('\\', "\\\\").replace('"', "\\\"");
+        let script = format!(
+            "do shell script \"{}\" with prompt \"{} wants to {}.\" with administrator privileges",
+            applescript(command),
+            crate::APP_NAME,
+            applescript(purpose),
+        );
+        match Command::new("/usr/bin/osascript").arg("-e").arg(script).output() {
+            Ok(out) if out.status.success() => Ok(()),
+            // -128 is "User canceled".
+            Ok(out) if String::from_utf8_lossy(&out.stderr).contains("-128") => {
+                Err("Cancelled: administrator permission was declined.".into())
+            }
+            other => Err(format!("Couldn't {purpose}: {}", checked(other).err().unwrap_or_default())),
+        }
+    }
+
+    /// A path quoted for the shell.
+    fn quote(path: &Path) -> String {
+        format!("'{}'", path.to_string_lossy().replace('\'', r"'\''"))
+    }
+
+    /// The command's error output if it failed.
+    fn checked(output: std::io::Result<Output>) -> Result<(), String> {
+        let out = output.map_err(|e| e.to_string())?;
+        if out.status.success() {
+            return Ok(());
+        }
+        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_owned();
+        Err(if stderr.is_empty() { format!("exit code {}", out.status.code().unwrap_or(-1)) } else { stderr })
     }
 }

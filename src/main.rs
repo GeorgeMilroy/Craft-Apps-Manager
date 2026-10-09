@@ -24,6 +24,10 @@ pub const APP_NAME: &str = "ArtCraft Apps Manager";
 /// It predates the rename to ArtCraft Apps Manager and is kept, along with the
 /// single-instance lock named after it, so old and new versions recognise each other.
 pub const APP_ID: &str = "ArtCraft.CraftAppsManager";
+/// The Mac app's bundle identifier, also used for its notifications and its
+/// LaunchAgent. Never change it: macOS keys permissions and settings to it.
+#[cfg(target_os = "macos")]
+pub const BUNDLE_ID: &str = "com.mecorelabs.artcraftappsmanager";
 
 fn main() -> eframe::Result<()> {
     // Passed by the sign-in startup entry, so the window doesn't pop up at login.

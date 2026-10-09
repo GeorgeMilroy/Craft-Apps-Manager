@@ -6,6 +6,7 @@ use image::{imageops, ImageFormat, RgbaImage};
 use std::sync::OnceLock;
 
 /// The multi-size Windows icon (16 to 256 px).
+#[cfg(windows)]
 pub const ICO: &[u8] = include_bytes!("../assets/logo.ico");
 const PNG: &[u8] = include_bytes!("../assets/logo.png");
 

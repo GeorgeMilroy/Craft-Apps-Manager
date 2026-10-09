@@ -17,6 +17,11 @@
         "source": "/download",
         "destination": "/download/{{file}}",
         "type": 302
+      },
+      {
+        "source": "/download/x86",
+        "destination": "/download/{{file_x86}}",
+        "type": 302
       }
     ],
     "headers": [

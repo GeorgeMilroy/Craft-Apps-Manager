@@ -1,5 +1,5 @@
 //! The apps this manager knows about. The built-in list covers every Craft
-//! app in the storytold organisation that publishes Windows builds; new ones
+//! app in the storytold organisation that publishes Windows and Mac builds; new ones
 //! are picked up at runtime by `check::discover`.
 
 use serde::{Deserialize, Serialize};

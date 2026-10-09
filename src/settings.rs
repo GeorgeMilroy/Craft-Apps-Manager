@@ -1,6 +1,7 @@
-//! Settings and the app's own bookkeeping, stored as JSON in the
-//! machine-wide C:\ProgramData\ArtCraftAppsManager folder. (Program Files is
-//! read-only without admin rights, so it can't hold them.)
+//! Settings and the app's own bookkeeping, stored as JSON. On Windows they're
+//! in the machine-wide C:\ProgramData\ArtCraftAppsManager folder (Program
+//! Files is read-only without admin rights, so it can't hold them). On macOS
+//! they're in ~/Library/Application Support/ArtCraftAppsManager.
 
 use crate::catalog::AppInfo;
 use crate::github::Release;
@@ -12,7 +13,7 @@ use std::{fs, io};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ThemeChoice {
-    /// Follow Windows' light or dark app mode.
+    /// Follow the system's light or dark mode.
     #[default]
     System,
     Light,
@@ -77,6 +78,18 @@ pub struct Paths {
 }
 
 impl Paths {
+    #[cfg(target_os = "macos")]
+    pub fn new() -> Self {
+        let home = std::env::var_os("HOME").map_or_else(|| PathBuf::from("/tmp"), PathBuf::from);
+        let data = home.join("Library").join("Application Support").join("ArtCraftAppsManager");
+        let paths = Paths { downloads: data.join("downloads"), logs: data.join("logs"), data };
+        for dir in [&paths.data, &paths.downloads, &paths.logs] {
+            let _ = fs::create_dir_all(dir);
+        }
+        paths
+    }
+
+    #[cfg(windows)]
     pub fn new() -> Self {
         let program_data = std::env::var_os("ProgramData").map_or_else(|| PathBuf::from(r"C:\ProgramData"), PathBuf::from);
         let data = program_data.join("ArtCraftAppsManager");
@@ -102,6 +115,7 @@ impl Paths {
     /// used C:\ProgramData\CraftAppsManager. Moves its contents across, then
     /// removes it. Anything that can't be moved yet, such as a file that's in
     /// use, is left for the next start.
+    #[cfg(windows)]
     fn move_from(&self, old: &Path) {
         let Ok(entries) = fs::read_dir(old) else {
             return;
@@ -120,6 +134,7 @@ impl Paths {
 
     /// Versions before 0.2 kept their data in %LOCALAPPDATA%. Carries the
     /// settings and state over once, then removes the old folder.
+    #[cfg(windows)]
     fn migrate_from_app_data(&self) {
         let Some(old) = std::env::var_os("LOCALAPPDATA").map(|d| PathBuf::from(d).join("CraftAppsManager")) else {
             return;

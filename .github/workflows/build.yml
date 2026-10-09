@@ -1,0 +1,93 @@
+# Builds and tests the app on macOS and Windows, and keeps the installers as
+# downloadable artifacts of each run. Pushing a tag like v0.4.1 also creates a
+# draft GitHub release with the installers attached, to check and publish.
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    name: macOS (universal)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        run: |
+          rustup update stable
+          rustup default stable
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Test
+        run: cargo test
+
+      - name: Build the app and disk image
+        run: bash installer/build-macos.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: target/installer/*.dmg
+          if-no-files-found: error
+
+  windows:
+    name: Windows (x64 and x86)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        run: |
+          rustup update stable
+          rustup default stable
+          rustup target add i686-pc-windows-msvc
+
+      - name: Set up WiX 5
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+          & "$env:USERPROFILE\.dotnet\tools\wix.exe" extension add -g WixToolset.Util.wixext/5.0.2
+          & "$env:USERPROFILE\.dotnet\tools\wix.exe" extension add -g WixToolset.UI.wixext/5.0.2
+
+      - name: Test
+        run: cargo test
+
+      - name: Build the installers
+        run: ./installer/build-installer.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: target/installer/*.msi
+          if-no-files-found: error
+
+  release:
+    name: Draft release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create a draft release with the installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --title "ArtCraft Apps Manager ${GITHUB_REF_NAME#v}" \
+            --generate-notes

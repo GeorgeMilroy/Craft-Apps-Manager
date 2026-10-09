@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Installs ArtCraft Apps Manager for all users in C:\Program Files.
-  Build with build-installer.ps1, which supplies Version, ExePath and IconPath.
+  Build with build-installer.ps1, which supplies Version, ExePath and IconPath,
+  and builds it twice: -arch x64 for 64-bit Windows and -arch x86 for 32-bit.
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <!-- Never change the UpgradeCode: it's how newer versions replace older ones,
        including those from before the rename, when this was Craft Apps Manager. -->
   <Package Name="ArtCraft Apps Manager"
-           Manufacturer="ArtCraft Apps Manager"
+           Manufacturer="ME Core Labs"
            Version="$(Version)"
            UpgradeCode="{032C5B86-1AB6-4991-BE7B-4B5EBA894761}"
            Scope="perMachine">
@@ -18,8 +19,56 @@
 
     <Icon Id="AppIcon.ico" SourceFile="$(IconPath)" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
-    <Property Id="ARPURLINFOABOUT" Value="https://github.com/storytold" />
+    <Property Id="ARPURLINFOABOUT" Value="https://mecorelabs.com" />
     <Property Id="ARPNOMODIFY" Value="1" />
+
+    <!-- The 32-bit MSI is only for 32-bit Windows. On 64-bit Windows it would install
+         alongside the 64-bit one rather than replacing it when the versions match.
+         Windows itself refuses the 64-bit MSI on 32-bit Windows. -->
+    <?if $(sys.BUILDARCH) = x86 ?>
+    <Launch Condition="Installed OR NOT VersionNT64"
+            Message="This is the 32-bit version of [ProductName], for 32-bit Windows. This PC has 64-bit Windows, so use the 64-bit (x64) installer instead." />
+    <?endif?>
+
+    <!-- Setup wizard: Welcome, Ready to install, progress, then Finish. There's no
+         licence page or folder choice. Running the MSI again when it's installed
+         offers Repair and Remove. -->
+    <UI Id="SetupWizard">
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+      <DialogRef Id="WelcomeDlg" />
+
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="1" Condition="NOT Installed" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed" />
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchManager" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
+    </UI>
+    <UIRef Id="WixUI_Common" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(sys.SOURCEFILEDIR)banner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(sys.SOURCEFILEDIR)dialog.bmp" />
+
+    <!-- The Finish page's "Launch" box, ticked by default. The wizard runs as the
+         signed-in user, so the app doesn't start with admin rights. -->
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch ArtCraft Apps Manager" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WixShellExecTarget" Value="[#ArtCraftAppsManagerExe]" />
+    <CustomAction Id="LaunchManager" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixShellExec" Impersonate="yes" />
 
     <!-- Closing the window only hides the app in the tray, so ask it to close and
          then end it, so that upgrades and uninstalls don't need a restart. The
@@ -29,7 +78,7 @@
     <util:CloseApplication Id="CloseOldManager" Target="craft-apps-manager.exe"
                            CloseMessage="yes" TerminateProcess="0" Timeout="3" RebootPrompt="no" />
 
-    <StandardDirectory Id="ProgramFiles64Folder">
+    <StandardDirectory Id="ProgramFiles6432Folder">
       <Directory Id="INSTALLFOLDER" Name="ArtCraft Apps Manager">
         <Component Id="MainExecutable">
           <File Id="ArtCraftAppsManagerExe" Source="$(ExePath)" KeyPath="yes">
@@ -48,25 +97,52 @@
       </Directory>
     </StandardDirectory>
 
+    <!-- Start menu entry that uninstalls, the same as Settings > Apps. A shortcut that
+         isn't advertised needs a key path of its own, so it gets a registry value.
+         ICE38, ICE43 and ICE57 want that value in HKCU because they assume the Start
+         menu is per-user, but here it's the all-users one. An HKCU value would only
+         exist for whoever installed, so for everyone else Windows Installer would
+         think the app was broken and repair it when they open it. -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="UninstallShortcut">
+        <Shortcut Id="UninstallShortcut"
+                  Name="Uninstall ArtCraft Apps Manager"
+                  Description="Remove ArtCraft Apps Manager and its settings"
+                  Target="[WindowsFolder]System32\msiexec.exe"
+                  Arguments="/x [ProductCode]"
+                  Icon="AppIcon.ico" />
+        <RegistryValue Root="HKLM" Key="Software\ME Core Labs\ArtCraft Apps Manager"
+                       Name="UninstallShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
     <!-- C:\ProgramData\ArtCraftAppsManager holds settings, the release cache, downloads
          and logs. Users get write access so the app runs without admin rights.
-         Left in place on uninstall, like most apps' settings. The app moves the
-         contents of the pre-rename folder, C:\ProgramData\CraftAppsManager, into it. -->
+         Uninstalling deletes it, but a newer version replacing this one keeps it.
+         The app moves the contents of the pre-rename folder,
+         C:\ProgramData\CraftAppsManager, into it. -->
     <StandardDirectory Id="CommonAppDataFolder">
       <Directory Id="DATAFOLDER" Name="ArtCraftAppsManager">
         <Component Id="DataFolder" Guid="{0CF3975E-5AD7-4729-8CA3-0D08DE9B279A}">
           <CreateFolder>
             <util:PermissionEx User="[WIX_ACCOUNT_USERS]" GenericAll="yes" />
           </CreateFolder>
+          <util:RemoveFolderEx On="uninstall" Property="DATAFOLDERPATH"
+                               Condition='REMOVE~="ALL" AND NOT UPGRADINGPRODUCTCODE' />
         </Component>
       </Directory>
     </StandardDirectory>
+    <!-- RemoveFolderEx runs before Windows Installer works out directory paths, so
+         it gets the folder from the system folder property, which is set from the start. -->
+    <SetProperty Id="DATAFOLDERPATH" Value="[CommonAppDataFolder]ArtCraftAppsManager"
+                 Before="AppSearch" Sequence="execute" />
     <!-- Defines WIX_ACCOUNT_USERS: the Users group's name in this Windows language. -->
     <util:QueryWindowsWellKnownSIDs />
 
     <Feature Id="Main">
       <ComponentRef Id="MainExecutable" />
       <ComponentRef Id="DataFolder" />
+      <ComponentRef Id="UninstallShortcut" />
     </Feature>
   </Package>
 </Wix>

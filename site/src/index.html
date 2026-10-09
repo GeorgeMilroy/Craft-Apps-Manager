@@ -14,6 +14,7 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="google-site-verification" content="XD8ouVWp3XSV2Db1V6BcBvuf1yyoJWC2YXiVE2eQEnw">
   <meta name="theme-color" content="#f2f1ee" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#121316" media="(prefers-color-scheme: dark)">
   <link rel="icon" href="/favicon.ico" sizes="any">
@@ -61,7 +62,7 @@
             </a>
             <a class="btn btn-lg" href="#apps">See the apps</a>
           </div>
-          <p class="hud meta">Version {{version}} <span>·</span> {{size}} <span>·</span> Free</p>
+          <p class="hud meta">Version {{version}} <span>·</span> {{size}} <span>·</span> Free <span>·</span> <a href="/download/{{file_x86}}" download data-download="hero-x86">32-bit version</a></p>
           <p class="aside">An independent project, not affiliated with ArtCraft. The apps are developed and supported by their creators at <a href="https://getartcraft.com/">getartcraft.com</a>.</p>
         </div>
         <figure class="shot">
@@ -186,7 +187,7 @@
           <li>
             <span class="step">2</span>
             <h3>Install</h3>
-            <p>Open it and allow the change when Windows asks. It installs for everyone who uses the PC.</p>
+            <p>Open it, follow the setup wizard and allow the change when Windows asks. It installs for everyone who uses the PC.</p>
           </li>
           <li>
             <span class="step">3</span>
@@ -197,10 +198,12 @@
         <p class="note">If Windows SmartScreen says it protected your PC, choose <strong>More info</strong>, then <strong>Run anyway</strong>. Windows shows this for installers it hasn't seen many downloads of yet.</p>
         <dl class="spec">
           <div><dt class="hud">Version</dt><dd>{{version}}, released {{released}}</dd></div>
-          <div><dt class="hud">File</dt><dd><a href="/download/{{file}}" download data-download="details">{{file}}</a> ({{size}})</dd></div>
-          <div><dt class="hud">Requires</dt><dd>Windows 10 or 11, 64-bit</dd></div>
+          <div><dt class="hud">Requires</dt><dd>Windows 10 or 11</dd></div>
           <div><dt class="hud">Installs to</dt><dd>C:\Program Files\ArtCraft Apps Manager</dd></div>
+          <div><dt class="hud">64-bit Windows</dt><dd><a href="/download/{{file}}" download data-download="details">{{file}}</a> ({{size}})</dd></div>
           <div><dt class="hud">SHA-256</dt><dd class="hash">{{sha256}}</dd></div>
+          <div><dt class="hud">32-bit Windows</dt><dd><a href="/download/{{file_x86}}" download data-download="details-x86">{{file_x86}}</a> ({{size_x86}})</dd></div>
+          <div><dt class="hud">SHA-256</dt><dd class="hash">{{sha256_x86}}</dd></div>
         </dl>
       </div>
     </section>
@@ -227,12 +230,16 @@
             <p>Closing the window keeps it in the system tray so it can check for updates. To stop it, choose Quit from the tray icon. It only starts with Windows if you turn that on in its Settings.</p>
           </details>
           <details>
+            <summary>Is there a 32-bit version?</summary>
+            <p>Yes, for 32-bit Windows 10: <a href="/download/{{file_x86}}" download data-download="faq-x86">{{file_x86}}</a> ({{size_x86}}). Windows 11 is always 64-bit, and so are most Windows 10 PCs, so most people need the main download. To check, open Settings › System › About and look at System type.</p>
+          </details>
+          <details>
             <summary>How do I update the manager itself?</summary>
             <p>Download the latest installer from this page and run it. It replaces the version you have.</p>
           </details>
           <details>
             <summary>How do I remove it?</summary>
-            <p>Uninstall ArtCraft Apps Manager from Settings › Apps › Installed apps. The apps you installed with it stay installed.</p>
+            <p>Choose Uninstall ArtCraft Apps Manager in the Start menu, or uninstall it from Settings › Apps › Installed apps. Either way, its settings and downloaded files are deleted too. The apps you installed with it stay installed.</p>
           </details>
         </div>
       </div>
